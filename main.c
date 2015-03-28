@@ -43,7 +43,7 @@ int main(int argc, const char * argv[]) {
         }
     }
     
-    struct am_device_notification *notification;
+    AMDeviceNotificationRef notification;
     if (AMDeviceNotificationSubscribe(&connection_callback, 0, 0, 0, &notification) == MDERR_OK) {
         //TCP server is running for the whole program life cycle
         if ((tcp_server_socket = start_tcp_server(server_port)) > 0) {
@@ -106,7 +106,7 @@ void connection_callback(struct am_device_notification_callback_info *info, void
             
         case ADNCI_MSG_DISCONNECTED:
             if (device) {
-                if (info->dev->device_id == device->device_id) {
+                if (info->dev == device) {
                     device = NULL;
                     puts("\n\r[!] Device has been disconnected.\r");
                     if (die_on_disconnect) {

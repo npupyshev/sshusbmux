@@ -99,10 +99,20 @@ extern "C" {
     typedef unsigned int usbmux_error_t;
     typedef unsigned int service_conn_t;
     
+    /* Structure typedefs */
+    
+    typedef struct am_restore_device* AMRestoreDeviceRef;
+    typedef struct am_recovery_device* AMRecoveryDeviceRef;
+    typedef struct am_device* AMDeviceRef;
+    typedef struct am_device_notification* AMDeviceNotificationRef;
+    typedef struct afc_connection* AFCConnectionRef;
+    typedef struct afc_directory* AFCDirectoryRef;
+    typedef struct afc_dictionary* AFCDictionaryRef;
+    
     struct am_recovery_device;
     
     typedef struct am_device_notification_callback_info {
-        struct am_device *dev;  /* 0    device */
+        AMDeviceRef dev;  /* 0    device */
         unsigned int msg;       /* 4    one of ADNCI_MSG_* */
     } __attribute__ ((packed)) am_device_notification_callback_info;
     
@@ -129,8 +139,6 @@ extern "C" {
         unsigned char unknown[32];
         int port;
     } __attribute__ ((packed)) am_restore_device;
-    typedef struct am_restore_device* AMRestoreDeviceRef;
-    typedef struct am_device* AMDeviceRef;
     typedef int muxconn_t;
     
     /* The type of the device notification callback function. */
@@ -225,7 +233,7 @@ extern "C" {
      *      MDERR_OUT_OF_MEMORY if we ran out of memory
      */
     
-    mach_error_t AMDeviceNotificationSubscribe(am_device_notification_callback callback, unsigned int unused0, unsigned int unused1, unsigned int cookie, struct am_device_notification **notification);
+    mach_error_t AMDeviceNotificationSubscribe(am_device_notification_callback callback, unsigned int unused0, unsigned int unused1, unsigned int cookie, AMDeviceNotificationRef *notification);
     
     
     /* Unregisters notifications. Buggy (iTunes 8.2): if you subscribe, unsubscribe and subscribe again, arriving
@@ -233,7 +241,7 @@ extern "C" {
      calls this function only once on exit.
      */
     
-    mach_error_t AMDeviceNotificationUnsubscribe(struct am_device_notification* subscription);
+    mach_error_t AMDeviceNotificationUnsubscribe(AMDeviceNotificationRef subscription);
     
     
     /*  Connects to the iPhone. Pass in the am_device structure that the
@@ -246,7 +254,7 @@ extern "C" {
      *      MDERR_INVALID_ARGUMENT  if USBMuxConnectByPort returned 0xffffffff
      */
     
-    mach_error_t AMDeviceConnect(struct am_device *device);
+    mach_error_t AMDeviceConnect(AMDeviceRef device);
     
     /*  Calls PairingRecordPath() on the given device, than tests whether the path
      *  which that function returns exists. During the initial connect, the path
@@ -257,7 +265,7 @@ extern "C" {
      *      1   if it did
      */
     
-    int AMDeviceIsPaired(struct am_device *device);
+    int AMDeviceIsPaired(AMDeviceRef device);
     
     /*  iTunes calls this function immediately after testing whether the device is
      *  paired. It creates a pairing file and establishes a Lockdown connection.
@@ -268,7 +276,7 @@ extern "C" {
      *      MDERR_DICT_NOT_LOADED   if the load_dict() call failed
      */
     
-    mach_error_t AMDeviceValidatePairing(struct am_device *device);
+    mach_error_t AMDeviceValidatePairing(AMDeviceRef device);
     
     /*  Creates a Lockdown session and adjusts the device structure appropriately
      *  to indicate that the session has been started. iTunes calls this function
@@ -280,7 +288,7 @@ extern "C" {
      *      MDERR_DICT_NOT_LOADED   if the load_dict() call failed
      */
     
-    mach_error_t AMDeviceStartSession(struct am_device *device);
+    mach_error_t AMDeviceStartSession(AMDeviceRef device);
     
     /* Starts a service and returns a handle that can be used in order to further
      * access the service. You should stop the session and disconnect before using
@@ -297,11 +305,11 @@ extern "C" {
      *      MDERR_INVALID_ARGUMENT  if the Lockdown conn has not been established
      */
     
-    mach_error_t AMDeviceStartService(struct am_device *device, CFStringRef service_name, service_conn_t *handle, unsigned int *unknown);
+    mach_error_t AMDeviceStartService(AMDeviceRef device, CFStringRef service_name, service_conn_t *handle, unsigned int *unknown);
     
     unsigned int AMDeviceGetInterfaceType(AMDeviceRef device);
     
-    mach_error_t AMDeviceStartHouseArrestService(struct am_device *device, CFStringRef identifier, void *unknown, service_conn_t *handle, unsigned int *what);
+    mach_error_t AMDeviceStartHouseArrestService(AMDeviceRef device, CFStringRef identifier, void *unknown, service_conn_t *handle, unsigned int *what);
     
     /* Stops a session. You should do this before accessing services.
      *
@@ -310,7 +318,7 @@ extern "C" {
      *      MDERR_INVALID_ARGUMENT  if the Lockdown conn has not been established
      */
     
-    mach_error_t AMDeviceStopSession(struct am_device *device);
+    mach_error_t AMDeviceStopSession(AMDeviceRef device);
     
     
     /* Reads various device settings. One of domain or cfstring arguments should be NULL.
@@ -379,7 +387,24 @@ extern "C" {
      * Actually returns id
      */
     
-    void *AMDeviceCopyValue(struct am_device *device, CFStringRef domain, CFStringRef cfstring);
+    void *AMDeviceCopyValue(AMDeviceRef device, CFStringRef domain, CFStringRef cfstring);
+    
+    /* These just get fields of am_device struct */
+    unsigned int AMDeviceGetConnectionID(AMDeviceRef device);
+    CFStringRef AMDeviceCopyDeviceIdentifier(AMDeviceRef device);
+    
+    /* Puts device into recovery */
+    mach_error_t AMDeviceEnterRecovery(AMDeviceRef device);
+    
+    /* Disconnects device */
+    mach_error_t AMDeviceDisconnect(AMDeviceRef device);
+    
+    /* Retain/Release AMDevice objects */
+    mach_error_t AMDeviceRetain(AMDeviceRef device);
+    mach_error_t AMDeviceRelease(AMDeviceRef device);
+    
+    /* Deactivates device */
+    mach_error_t AMDeviceDeactivate(AMDeviceRef device);
     
     /* Opens an Apple File Connection. You must start the appropriate service
      * first with AMDeviceStartService(). In iTunes, io_timeout is 0.
@@ -389,10 +414,10 @@ extern "C" {
      *      MDERR_AFC_OUT_OF_MEMORY if malloc() failed
      */
     
-    afc_error_t AFCConnectionOpen(service_conn_t handle, unsigned int io_timeout, struct afc_connection **conn);
+    afc_error_t AFCConnectionOpen(service_conn_t handle, unsigned int io_timeout, AFCConnectionRef *conn);
     
     /* Pass in a pointer to an afc_device_info structure. It will be filled. */
-    afc_error_t AFCDeviceInfoOpen(afc_connection *conn, struct afc_dictionary **info);
+    afc_error_t AFCDeviceInfoOpen(AFCConnectionRef conn, AFCDictionaryRef *info);
     
     /* Turns debug mode on if the environment variable AFCDEBUG is set to a numeric
      * value, or if the file '/AFCDEBUG' is present and contains a value. */
@@ -407,7 +432,7 @@ extern "C" {
      *      MDERR_OK                if successful
      */
     
-    afc_error_t AFCDirectoryOpen(afc_connection *conn, const char *path, struct afc_directory **dir);
+    afc_error_t AFCDirectoryOpen(AFCConnectionRef conn, const char *path, AFCDirectoryRef *dir);
     
     /* Acquires the next entry in a directory previously opened with
      * AFCDirectoryOpen(). When dirent is filled with a NULL value, then the end
@@ -419,29 +444,45 @@ extern "C" {
      *      MDERR_OK                if successful, even if no entries remain
      */
     
-    afc_error_t AFCDirectoryRead(afc_connection *conn/*unsigned int unused*/, struct afc_directory *dir, char **dirent);
+    afc_error_t AFCDirectoryRead(AFCConnectionRef conn/*unsigned int unused*/, AFCDirectoryRef dir, char **dirent);
     
-    afc_error_t AFCDirectoryClose(afc_connection *conn, struct afc_directory *dir);
-    afc_error_t AFCDirectoryCreate(afc_connection *conn, const char *dirname);
-    afc_error_t AFCRemovePath(afc_connection *conn, const char *dirname);
-    afc_error_t AFCRenamePath(afc_connection *conn, const char *from, const char *to);
-    afc_error_t AFCLinkPath(afc_connection *conn, long long int linktype, const char *target, const char *linkname);
+    afc_error_t AFCDirectoryClose(AFCConnectionRef conn, AFCDirectoryRef dir);
+    afc_error_t AFCDirectoryCreate(AFCConnectionRef conn, const char *dirname);
+    afc_error_t AFCRemovePath(AFCConnectionRef conn, const char *dirname);
+    afc_error_t AFCRenamePath(AFCConnectionRef conn, const char *from, const char *to);
+    afc_error_t AFCLinkPath(AFCConnectionRef conn, long long int linktype, const char *target, const char *linkname);
     
     /* Returns the context field of the given AFC connection. */
-    unsigned int AFCConnectionGetContext(afc_connection *conn);
+    unsigned int AFCConnectionGetContext(AFCConnectionRef conn);
     
     /* Returns the fs_block_size field of the given AFC connection. */
-    unsigned int AFCConnectionGetFSBlockSize(afc_connection *conn);
+    unsigned int AFCConnectionGetFSBlockSize(AFCConnectionRef conn);
     
     /* Returns the io_timeout field of the given AFC connection. In iTunes this is
      * 0. */
-    unsigned int AFCConnectionGetIOTimeout(afc_connection *conn);
+    unsigned int AFCConnectionGetIOTimeout(AFCConnectionRef conn);
     
     /* Returns the sock_block_size field of the given AFC connection. */
-    unsigned int AFCConnectionGetSocketBlockSize(afc_connection *conn);
+    unsigned int AFCConnectionGetSocketBlockSize(AFCConnectionRef conn);
     
     /* Closes the given AFC connection. */
-    afc_error_t AFCConnectionClose(afc_connection *conn);
+    afc_error_t AFCConnectionClose(AFCConnectionRef conn);
+    
+    /* These five work just like stdlib friends do */
+    
+    /* mode 2 = read, mode 3 = write */
+    afc_error_t AFCFileRefOpen(AFCConnectionRef conn, const char *path, unsigned long long mode, afc_file_ref *ref);
+    afc_error_t AFCFileRefSeek(AFCConnectionRef conn, afc_file_ref ref, unsigned long long offset1, unsigned long long offset2);
+    afc_error_t AFCFileRefRead(AFCConnectionRef conn, afc_file_ref ref, void *buf, unsigned int *len);
+    afc_error_t AFCFileRefWrite(AFCConnectionRef conn, afc_file_ref ref, const void *buf, unsigned int len);
+    afc_error_t AFCFileRefClose(AFCConnectionRef conn, afc_file_ref ref);
+    
+    afc_error_t AFCFileRefSetFileSize(AFCConnectionRef conn, afc_file_ref ref, unsigned long long offset);
+    
+    afc_error_t AFCFileInfoOpen(AFCConnectionRef conn, const char *path, AFCDictionaryRef *info);
+    afc_error_t AFCKeyValueRead(AFCDictionaryRef dict, char **key, char **val);
+    /* Releases AFCDictictionary object? */
+    afc_error_t AFCKeyValueClose(AFCDictionaryRef dict);
     
     /* Registers for device notifications related to the restore process. unknown0
      * is zero when iTunes calls this. In iTunes,
@@ -486,58 +527,46 @@ extern "C" {
     
     CFMutableDictionaryRef AMRestoreCreateDefaultOptions(CFAllocatorRef allocator);
     
+    unsigned int AMRestorePerformRecoveryModeRestore(AMRecoveryDeviceRef rdev, CFDictionaryRef opts, void *callback, void *user_info);
+    unsigned int AMRestorePerformRestoreModeRestore(AMRecoveryDeviceRef rrdev, CFDictionaryRef opts, void *callback, void *user_info);
+    
+    AMRestoreDeviceRef rAMRestoreModeDeviceCreate(unsigned int unknown0, unsigned int connection_id, unsigned int unknown1);
+    
+    unsigned int AMRestoreCreatePathsForBundle(CFStringRef restore_bundle_path, CFStringRef kernel_cache_type, CFStringRef boot_image_type, unsigned int unknown0, CFStringRef *firmware_dir_path, CFStringRef *kernelcache_restore_path, unsigned int unknown1, CFStringRef *ramdisk_path);
+    
+    /* Sets nvram auto-boot value of device connected in recovery mode to state string representation */
+    unsigned int AMRecoveryModeDeviceSetAutoBoot(AMRecoveryDeviceRef rdev, bool state);
+    
+    /* Reboots device connected in recovery mode */
+    unsigned int AMRecoveryModeDeviceReboot(AMRecoveryDeviceRef rdev);
+    
+    /* Sends a command to iBoot recovery shell */
+    unsigned int AMRecoveryModeDeviceSendCommandToDevice(AMRecoveryDeviceRef rdev, CFStringRef command);
+    
+    /* Sends a file to device (used when something gets exploited through recovery mode) */
+    unsigned int AMRecoveryModeSendFileToDevice(AMRecoveryDeviceRef rdev, CFStringRef filename);
+    
+    /* Sends a command to iBoot recovery shell (without waiting for the answer?) */
+    unsigned int AMRecoveryModeDeviceSendBlindCommandToDevice(AMRecoveryDeviceRef rdev, CFStringRef command);
+    
     /* ----------------------------------------------------------------------------
      *   Less-documented public routines
      * ------------------------------------------------------------------------- */
     
-    /* mode 2 = read, mode 3 = write */
-    afc_error_t AFCFileRefOpen(afc_connection *conn, const char *path, unsigned long long mode, afc_file_ref *ref);
-    afc_error_t AFCFileRefSeek(afc_connection *conn, afc_file_ref ref, unsigned long long offset1, unsigned long long offset2);
-    afc_error_t AFCFileRefRead(afc_connection *conn, afc_file_ref ref, void *buf, unsigned int *len);
-    afc_error_t AFCFileRefSetFileSize(afc_connection *conn, afc_file_ref ref, unsigned long long offset);
-    afc_error_t AFCFileRefWrite(afc_connection *conn, afc_file_ref ref, const void *buf, unsigned int len);
-    afc_error_t AFCFileRefClose(afc_connection *conn, afc_file_ref ref);
-    
-    afc_error_t AFCFileInfoOpen(afc_connection *conn, const char *path, struct afc_dictionary **info);
-    afc_error_t AFCKeyValueRead(struct afc_dictionary *dict, char **key, char **val);
-    afc_error_t AFCKeyValueClose(struct afc_dictionary *dict);
-    
-    unsigned int AMRestorePerformRecoveryModeRestore(struct am_recovery_device *rdev, CFDictionaryRef opts, void *callback, void *user_info);
-    unsigned int AMRestorePerformRestoreModeRestore(struct am_restore_device *rdev, CFDictionaryRef opts, void *callback, void *user_info);
-    
-    struct am_restore_device *AMRestoreModeDeviceCreate(unsigned int unknown0, unsigned int connection_id, unsigned int unknown1);
-    
-    unsigned int AMRestoreCreatePathsForBundle(CFStringRef restore_bundle_path, CFStringRef kernel_cache_type, CFStringRef boot_image_type, unsigned int unknown0, CFStringRef *firmware_dir_path, CFStringRef *kernelcache_restore_path, unsigned int unknown1, CFStringRef *ramdisk_path);
-    
-    unsigned int AMDeviceGetConnectionID(struct am_device *device);
-    mach_error_t AMDeviceEnterRecovery(struct am_device *device);
-    mach_error_t AMDeviceDisconnect(struct am_device *device);
-    mach_error_t AMDeviceRetain(struct am_device *device);
-    mach_error_t AMDeviceRelease(struct am_device *device);
-    CFStringRef AMDeviceCopyDeviceIdentifier(struct am_device *device);
-    
     typedef void (*notify_callback)(CFStringRef notification, void *data);
     
+    /* If it interacts with device's darwin notification center, it's great */
     mach_error_t AMDPostNotification(service_conn_t socket, CFStringRef  notification, CFStringRef userinfo);
     mach_error_t AMDObserveNotification(void *socket, CFStringRef notification);
     mach_error_t AMDListenForNotifications(void *socket, notify_callback cb, void *data);
     mach_error_t AMDShutdownNotificationProxy(void *socket);
     
-    /*edits by greysyntax*/
-    unsigned int AMRecoveryModeDeviceSetAutoBoot(struct am_recovery_device *rdev, bool state);
-    unsigned int AMRecoveryModeDeviceReboot(struct am_recovery_device *rdev);
-    unsigned int AMRecoveryModeDeviceSendCommandToDevice(struct am_recovery_device *rdev, CFStringRef command);
-    unsigned int AMRecoveryModeSendFileToDevice(struct am_recovery_device *rdev, CFStringRef filename);
-    unsigned int AMRecoveryModeDeviceSendBlindCommandToDevice(struct am_recovery_device *rdev, CFStringRef command);
-    /*end*/
-    
     /*edits by geohot*/
-    mach_error_t AMDeviceDeactivate(struct am_device *device);
-    mach_error_t AMDeviceActivate(struct am_device *device, CFMutableDictionaryRef);
-    mach_error_t AMDeviceRemoveValue(struct am_device *device, unsigned int, const struct __CFString *cfstring);
+    mach_error_t AMDeviceActivate(AMDeviceRef device, CFMutableDictionaryRef);
+    mach_error_t AMDeviceRemoveValue(AMDeviceRef device, unsigned int, const struct __CFString *cfstring);
     /*end*/
     
-    void *AMDeviceSerialize(struct am_device *device);
+    void *AMDeviceSerialize(AMDeviceRef device);
     void AMDAddLogFileDescriptor(int fd);
     kern_return_t AMDeviceSendMessage(service_conn_t socket, void *unused, CFPropertyListRef plist);
     kern_return_t AMDeviceReceiveMessage(service_conn_t socket, CFDictionaryRef options, CFPropertyListRef * result);
@@ -557,6 +586,13 @@ extern "C" {
     
     usbmux_error_t USBMuxListenerCreate(struct usbmux_listener_1 *esi_fp8, struct
                                         usbmux_listener_2 **eax_fp12);
+    
+    /* Prints some debug messages to syslog 
+     * Maybe it returns nothing, maybe mach_error_t, no one knows
+     * priority parameter looks like priority. It's 3 for warning and 7 for error
+     * but actually that doesn't matter because output is always the same.
+     */
+    mach_error_t AMRLog(unsigned int priority, CFStringRef format, ...);
     
     /* ----------------------------------------------------------------------------
      *   Less-documented semi-private routines
@@ -581,8 +617,7 @@ extern "C" {
     typedef void (*t_restored_send_message)(int port, CFDictionaryRef msg);
     t_restored_send_message _restored_send_message = (t_restored_send_message)0x3c3a4e40;
     
-    typedef CFDictionaryRef (*t_restored_receive_message)(int port);
-    t_restored_receive_message restored_receive_message ;//= (t_restored_receive_message)0x3c3a4d40;
+    CFDictionaryRef _restored_receive_message(int port);//Wut? Port?
     
     void restored_message_type_equals();
     
