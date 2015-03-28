@@ -11,8 +11,4 @@ sshusbmux [Options]
 - -h         display help message.
 
 # build
-<<<<<<< HEAD
 make; sudo make install
-=======
-make; sudo make install
->>>>>>> dbf570369ab332796ab733a86aba10804a48400b
